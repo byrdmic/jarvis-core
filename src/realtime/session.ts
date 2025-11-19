@@ -28,7 +28,7 @@ export class JarvisSession {
   constructor(eventCallback?: JarvisEventCallback) {
     this.eventCallback = eventCallback
 
-    const url = "wss://api.openai.com/v1/realtime?model=gpt-realtime";
+    const url = "wss://api.openai.com/v1/realtime?model=gpt-realtime-mini";
 
     this.ws = new WebSocket(url, {
       headers: {
@@ -97,7 +97,6 @@ export class JarvisSession {
 
   private async handleMessage(data: WebSocket.RawData): Promise<void> {
     const msg = JSON.parse(data.toString())
-    console.log('[/realtime/session] msg type:', msg.type)
 
     // Handle text streaming
     if (msg.type === 'error') {
