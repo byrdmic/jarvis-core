@@ -1,5 +1,5 @@
 import WebSocket from 'ws'
-import { config, createSessionConfig, createUserMessageEvent, createAudioMessageEvent } from '../config'
+import { config, createSessionConfig, createUserMessageEvent, createAudioAppendEvent } from '../config'
 import { toolsSchema } from '../tools/schema'
 import { toolHandlers } from '../tools'
 import type { ResponseDone } from './types'
@@ -69,11 +69,11 @@ export class JarvisSession {
   async sendAudio(audioBase64: string): Promise<void> {
     await this.ready
 
-    const audioAppendEvent = {
-      type: 'input_audio_buffer.append',
-      audio: audioBase64
-    }
+    const audioAppendEvent = createAudioAppendEvent(audioBase64)
     this.ws.send(JSON.stringify(audioAppendEvent))
+    
+    // Optional: Log to verify we are sending data
+    // console.log('[JarvisSession] Sent audio chunk')
 
     // Note: OpenAI handles automatic response creation for audio input
     // when using server VAD, so we don't need to manually call createResponse()
@@ -97,6 +97,9 @@ export class JarvisSession {
 
   private async handleMessage(data: WebSocket.RawData): Promise<void> {
     const msg = JSON.parse(data.toString())
+    
+    // Log all events from OpenAI for debugging
+    console.log('[JarvisSession] Event from OpenAI:', msg.type)
 
     // Handle text streaming
     if (msg.type === 'error') {

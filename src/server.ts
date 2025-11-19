@@ -24,10 +24,17 @@ const server = Bun.serve<{ deviceId: string }>({
     message(ws, message) {
       // Messages are handled by DeviceManager
       // console.log(`[server] WebSocket message from device: ${ws.data.deviceId}`)
-      deviceManager.handleMessage(ws, message)
+      console.log(`[server] Message type: ${typeof message}, size: ${Buffer.isBuffer(message) ? message.length : 'N/A'}`)
+      
+      // Convert Buffer to ArrayBuffer if necessary for DeviceManager
+      const msgForManager = Buffer.isBuffer(message) 
+        ? message.buffer.slice(message.byteOffset, message.byteOffset + message.byteLength) 
+        : message
+
+      deviceManager.handleMessage(ws, msgForManager)
     },
     close(ws) {
-      // console.log(`[server] WebSocket closed for device: ${ws.data.deviceId}`)
+      console.log(`[server] WebSocket closed for device: ${ws.data.deviceId}`)
       // DeviceManager handles cleanup
       deviceManager.handleClose(ws)
     },

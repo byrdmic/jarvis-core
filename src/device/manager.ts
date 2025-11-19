@@ -1,14 +1,20 @@
-import { JarvisSession, JarvisEvent } from '../realtime/session'
+import { JarvisSession, type JarvisEvent } from '../realtime/session'
 import { appendFile, mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 
 export class DeviceManager {
-  private devices = new Map<string, {
-    ws: Bun.ServerWebSocket<{ deviceId: string }>
-    session: JarvisSession
-  }>()
+  private devices = new Map<
+    string,
+    {
+      ws: Bun.ServerWebSocket<{ deviceId: string }>
+      session: JarvisSession
+    }
+  >()
 
-  handleConnection(ws: Bun.ServerWebSocket<{ deviceId: string }>, deviceId: string): void {
+  handleConnection(
+    ws: Bun.ServerWebSocket<{ deviceId: string }>,
+    deviceId: string,
+  ): void {
     console.log(`[DeviceManager] Device connected: ${deviceId}`)
 
     // Create a new Jarvis session for this device
@@ -20,7 +26,10 @@ export class DeviceManager {
     this.devices.set(deviceId, { ws, session })
   }
 
-  handleMessage(ws: Bun.ServerWebSocket<{ deviceId: string }>, message: ArrayBuffer | string): void {
+  handleMessage(
+    ws: Bun.ServerWebSocket<{ deviceId: string }>,
+    message: ArrayBuffer | string,
+  ): void {
     const deviceId = ws.data.deviceId
     this.handleDeviceMessage(deviceId, message)
   }
@@ -35,7 +44,10 @@ export class DeviceManager {
     }
   }
 
-  private handleDeviceMessage(deviceId: string, data: ArrayBuffer | string): void {
+  private handleDeviceMessage(
+    deviceId: string,
+    data: ArrayBuffer | string,
+  ): void {
     const device = this.devices.get(deviceId)
     if (!device) {
       console.error(`[DeviceManager] No device found for ${deviceId}`)
@@ -44,9 +56,15 @@ export class DeviceManager {
 
     if (data instanceof ArrayBuffer) {
       // Handle binary audio data
+      console.log(
+        `[DeviceManager] Received audio data: ${data.byteLength} bytes`,
+      )
       const audioBase64 = Buffer.from(data).toString('base64')
       device.session.sendAudio(audioBase64).catch((error) => {
-        console.error(`[DeviceManager] Error sending audio for ${deviceId}:`, error)
+        console.error(
+          `[DeviceManager] Error sending audio for ${deviceId}:`,
+          error,
+        )
       })
     } else if (typeof data === 'string') {
       // Handle text messages (for debugging or text input)
@@ -54,13 +72,19 @@ export class DeviceManager {
         const message = JSON.parse(data)
         if (message.type === 'text') {
           device.session.sendText(message.text).catch((error) => {
-            console.error(`[DeviceManager] Error sending text for ${deviceId}:`, error)
+            console.error(
+              `[DeviceManager] Error sending text for ${deviceId}:`,
+              error,
+            )
           })
         } else if (message.type === 'commit') {
           device.session.generateResponse()
         }
       } catch (error) {
-        console.error(`[DeviceManager] Invalid JSON message from ${deviceId}:`, error)
+        console.error(
+          `[DeviceManager] Invalid JSON message from ${deviceId}:`,
+          error,
+        )
       }
     }
   }
@@ -68,7 +92,9 @@ export class DeviceManager {
   private handleJarvisEvent(deviceId: string, event: JarvisEvent): void {
     const device = this.devices.get(deviceId)
     if (!device) {
-      console.error(`[DeviceManager] No device found for event from ${deviceId}`)
+      console.error(
+        `[DeviceManager] No device found for event from ${deviceId}`,
+      )
       return
     }
 
@@ -79,39 +105,52 @@ export class DeviceManager {
         device.ws.send(audioBuffer)
       } else if (event.type === 'text_delta') {
         // Send text delta as JSON message
-        device.ws.send(JSON.stringify({
-          type: 'text_delta',
-          text: event.data
-        }))
+        device.ws.send(
+          JSON.stringify({
+            type: 'text_delta',
+            text: event.data,
+          }),
+        )
       } else if (event.type === 'audio_transcript_delta') {
         // Send transcription delta
-        device.ws.send(JSON.stringify({
-          type: 'transcript_delta',
-          text: event.data
-        }))
+        device.ws.send(
+          JSON.stringify({
+            type: 'transcript_delta',
+            text: event.data,
+          }),
+        )
       } else if (event.type === 'user_transcript') {
         // Log transcript to file
         this.logTranscript(deviceId, event.data)
 
         // Send user transcription
-        device.ws.send(JSON.stringify({
-          type: 'user_transcript',
-          text: event.data
-        }))
+        device.ws.send(
+          JSON.stringify({
+            type: 'user_transcript',
+            text: event.data,
+          }),
+        )
       } else if (event.type === 'response_done') {
         // Send response completion
-        device.ws.send(JSON.stringify({
-          type: 'response_done'
-        }))
+        device.ws.send(
+          JSON.stringify({
+            type: 'response_done',
+          }),
+        )
       } else if (event.type === 'error') {
         // Send error to device
-        device.ws.send(JSON.stringify({
-          type: 'error',
-          error: event.data?.message || 'Unknown error'
-        }))
+        device.ws.send(
+          JSON.stringify({
+            type: 'error',
+            error: event.data?.message || 'Unknown error',
+          }),
+        )
       }
     } catch (error) {
-      console.error(`[DeviceManager] Error sending event to ${deviceId}:`, error)
+      console.error(
+        `[DeviceManager] Error sending event to ${deviceId}:`,
+        error,
+      )
     }
   }
 
@@ -134,7 +173,10 @@ export class DeviceManager {
     try {
       await mkdir(logDir, { recursive: true })
       const timestamp = new Date().toISOString()
-      await appendFile(join(logDir, 'transcripts.log'), `[${timestamp}] [${deviceId}] ${text}\n`)
+      await appendFile(
+        join(logDir, 'transcripts.log'),
+        `[${timestamp}] [${deviceId}] ${text}\n`,
+      )
     } catch (err) {
       console.error('[DeviceManager] Failed to log transcript:', err)
     }

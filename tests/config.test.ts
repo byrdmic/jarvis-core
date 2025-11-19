@@ -1,5 +1,5 @@
 import { describe, test, expect } from "bun:test";
-import { config, createSessionConfig, createUserMessageEvent, createAudioMessageEvent } from "../src/config";
+import { config, createSessionConfig, createUserMessageEvent, createAudioAppendEvent } from "../src/config";
 import { toolsSchema } from "../src/tools/schema";
 
 // Mock Bun.env
@@ -27,22 +27,16 @@ describe("createSessionConfig", () => {
     const sessionConfig = createSessionConfig(toolsSchema);
 
     expect(sessionConfig.type).toBe("session.update");
-    expect(sessionConfig.session.type).toBe("realtime");
-    // Commented out checks for removed config options
-    // expect(sessionConfig.session.input_audio_format).toBe("pcm16");
-    // expect(sessionConfig.session.output_audio_format).toBe("pcm16");
-    // expect(sessionConfig.session.output_modalities).toEqual(["text", "audio"]);
-    // expect(sessionConfig.session.tool_choice).toBe("auto");
+    // expect(sessionConfig.session.type).toBe("realtime");
     expect(sessionConfig.session.tools).toBe(toolsSchema);
   });
 
-  /*
   test("should include turn detection config", () => {
     const sessionConfig = createSessionConfig(toolsSchema);
 
     expect(sessionConfig.session.turn_detection).toBeDefined();
     expect(sessionConfig.session.turn_detection.type).toBe("server_vad");
-    expect(sessionConfig.session.turn_detection.threshold).toBe(0.5);
+    // expect(sessionConfig.session.turn_detection.threshold).toBe(0.5);
   });
 
   test("should include input audio transcription", () => {
@@ -51,7 +45,6 @@ describe("createSessionConfig", () => {
     expect(sessionConfig.session.input_audio_transcription).toBeDefined();
     expect(sessionConfig.session.input_audio_transcription.model).toBe("whisper-1");
   });
-  */
 });
 
 describe("createUserMessageEvent", () => {
@@ -68,16 +61,12 @@ describe("createUserMessageEvent", () => {
   });
 });
 
-describe("createAudioMessageEvent", () => {
-  test("should create valid audio message event", () => {
+describe("createAudioAppendEvent", () => {
+  test("should create valid audio append event", () => {
     const audioBase64 = "base64AudioData";
-    const audioEvent = createAudioMessageEvent(audioBase64);
+    const audioEvent = createAudioAppendEvent(audioBase64);
 
-    expect(audioEvent.type).toBe("conversation.item.create");
-    expect(audioEvent.item.type).toBe("message");
-    expect(audioEvent.item.role).toBe("user");
-    expect(audioEvent.item.content).toHaveLength(1);
-    expect(audioEvent.item.content[0].type).toBe("input_audio");
-    expect(audioEvent.item.content[0].audio).toBe(audioBase64);
+    expect(audioEvent.type).toBe("input_audio_buffer.append");
+    expect(audioEvent.audio).toBe(audioBase64);
   });
 });

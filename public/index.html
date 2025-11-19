@@ -311,6 +311,7 @@
         <div class="controls-overlay">
             <button id="btnConnect">Initialize System</button>
             <button id="btnMic" disabled>Microphone: OFF</button>
+            <button id="btnDebug">Debug: OFF</button>
         </div>
     </div>
 
@@ -326,6 +327,7 @@
         let analyser = null;
         let isMicActive = false;
         let isConnected = false;
+        let isDebug = false;
         
         // Audio Queue
         let audioQueue = [];
@@ -335,6 +337,7 @@
         // Elements
         const btnConnect = document.getElementById('btnConnect');
         const btnMic = document.getElementById('btnMic');
+        const btnDebug = document.getElementById('btnDebug');
         const statusDiv = document.getElementById('connectionStatus');
         const statusText = document.getElementById('statusText');
         const logDiv = document.getElementById('log');
@@ -357,6 +360,13 @@
             logDiv.scrollTop = logDiv.scrollHeight;
         }
 
+        function logDebug(msg) {
+            if (isDebug) {
+                console.log('[DEBUG]', msg);
+                log(msg, 'system');
+            }
+        }
+
         // --- Audio Processing ---
         function floatTo16BitPCM(output, offset, input) {
             for (let i = 0; i < input.length; i++, offset += 2) {
@@ -368,6 +378,7 @@
         async function initAudio() {
             try {
                 audioContext = new AudioContext({ sampleRate: SAMPLE_RATE });
+                nextStartTime = 0;
                 analyser = audioContext.createAnalyser();
                 analyser.fftSize = 2048;
                 
@@ -396,6 +407,9 @@
                     
                     if (ws && ws.readyState === WebSocket.OPEN) {
                         ws.send(pcm16Buffer);
+                        logDebug(`Sent audio chunk: ${pcm16Buffer.byteLength} bytes`);
+                    } else {
+                        logDebug(`WebSocket not open, skipping audio chunk`);
                     }
                 };
 
@@ -469,6 +483,20 @@
 
                 analyser.getByteFrequencyData(dataArray);
 
+                // Determine who is speaking
+                const isJarvisSpeaking = audioContext && nextStartTime > audioContext.currentTime;
+                const isUserSpeaking = isMicActive && !isJarvisSpeaking;
+                
+                let hueBase = 180; // Cyan
+                let colorHex = '#00f3ff';
+                let colorRGB = '0, 243, 255';
+
+                if (isUserSpeaking) {
+                    hueBase = 340; // Pink/Red
+                    colorHex = '#ff3366';
+                    colorRGB = '255, 51, 102';
+                }
+
                 ctx.fillStyle = 'rgba(5, 5, 5, 0.2)'; // Fade out trail
                 ctx.fillRect(0, 0, w, h);
 
@@ -489,7 +517,7 @@
                     const x2 = cx + Math.cos(angle) * (radius + barHeight);
                     const y2 = cy + Math.sin(angle) * (radius + barHeight);
 
-                    const hue = 180 + (percent * 60); // Cyan to Blue
+                    const hue = hueBase + (percent * 60);
                     ctx.strokeStyle = `hsl(${hue}, 100%, 50%)`;
                     ctx.lineWidth = 2;
                     
@@ -503,7 +531,7 @@
                 ctx.arc(cx, cy, radius - 5, 0, Math.PI * 2);
                 ctx.fillStyle = '#000';
                 ctx.fill();
-                ctx.strokeStyle = '#00f3ff';
+                ctx.strokeStyle = colorHex;
                 ctx.lineWidth = 2;
                 ctx.stroke();
                 
@@ -511,7 +539,7 @@
                 const avg = dataArray.reduce((a,b) => a+b, 0) / bufferLength;
                 ctx.beginPath();
                 ctx.arc(cx, cy, (radius/2) + (avg/2), 0, Math.PI * 2);
-                ctx.fillStyle = `rgba(0, 243, 255, ${avg/255})`;
+                ctx.fillStyle = `rgba(${colorRGB}, ${avg/255})`;
                 ctx.fill();
             }
             draw();
@@ -557,16 +585,19 @@
             ws.onmessage = async (event) => {
                 const data = event.data;
 
+                if (typeof data === 'string') {
+                    logDebug(`Received text data: ${data.substring(0, 100)}${data.length > 100 ? '...' : ''}`);
+                } else {
+                    logDebug(`Received binary data: ${data.byteLength} bytes`);
+                }
+
                 log(`Received: ${data}`, 'system');
                 if (data instanceof ArrayBuffer) {
                     playAudioChunk(data);
                 } else {
                     try {
                         const msg = JSON.parse(data);
-                        if (msg.type === 'transcript_delta') {
-                            // Optional: show partial Jarvis transcript?
-                            // log(`Jarvis: ${msg.text}`, 'jarvis');
-                        } else if (msg.type === 'text_delta') {
+                        if (msg.type === 'transcript_delta' || msg.type === 'text_delta') {
                              if (!currentResponseDiv) {
                                  currentResponseDiv = document.createElement('div');
                                  currentResponseDiv.className = 'chat-msg chat-msg-jarvis';
@@ -605,6 +636,13 @@
                 // Send commit signal just in case we cut off mid-sentence?
                 // ws.send(JSON.stringify({ type: 'commit' }));
             }
+        };
+
+        btnDebug.onclick = () => {
+            isDebug = !isDebug;
+            btnDebug.textContent = isDebug ? 'Debug: ON' : 'Debug: OFF';
+            btnDebug.className = isDebug ? 'active' : '';
+            log(`Debug mode ${isDebug ? 'enabled' : 'disabled'}`, 'system');
         };
 
         // --- Chat Interaction ---
