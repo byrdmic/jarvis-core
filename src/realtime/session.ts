@@ -8,6 +8,7 @@ export type JarvisEventType =
   | 'text_delta'
   | 'audio_delta'
   | 'audio_transcript_delta'
+  | 'user_transcript'
   | 'response_done'
   | 'error'
 
@@ -34,6 +35,7 @@ export class JarvisSession {
     this.ws = new WebSocket(url, {
       headers: {
         Authorization: `Bearer ${config.openaiApiKey}`,
+        'OpenAI-Beta': 'realtime=v1',
       },
     })
 
@@ -69,8 +71,11 @@ export class JarvisSession {
   async sendAudio(audioBase64: string): Promise<void> {
     await this.ready
 
-    const audioMessageEvent = createAudioMessageEvent(audioBase64)
-    this.ws.send(JSON.stringify(audioMessageEvent))
+    const audioAppendEvent = {
+      type: 'input_audio_buffer.append',
+      audio: audioBase64
+    }
+    this.ws.send(JSON.stringify(audioAppendEvent))
 
     // Note: OpenAI handles automatic response creation for audio input
     // when using server VAD, so we don't need to manually call createResponse()
@@ -121,6 +126,14 @@ export class JarvisSession {
       this.eventCallback?.({
         type: 'audio_transcript_delta',
         data: msg.delta
+      })
+    }
+
+    // Handle user audio transcription completed
+    if (msg.type === 'conversation.item.input_audio_transcription.completed') {
+      this.eventCallback?.({
+        type: 'user_transcript',
+        data: msg.transcript
       })
     }
 

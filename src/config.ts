@@ -1,6 +1,6 @@
 export const config = {
   openaiApiKey: Bun.env.OPENAI_API_KEY ?? '',
-  openaiRealtimeModel: 'gpt-4o-realtime-preview-2024-10-01', // Forced override for testing
+  openaiRealtimeModel: 'gpt-4o-realtime-preview-2024-12-17', // Update to latest model version
   n8nWebhookUrl: Bun.env.N8N_JARVIS_WEBHOOK_URL ?? '',
   port: Number(Bun.env.PORT ?? 4000),
 }
@@ -18,7 +18,6 @@ if (!config.n8nWebhookUrl) {
 export const createSessionConfig = (toolsSchema: any) => ({
   type: 'session.update',
   session: {
-    type: 'realtime',
     instructions: `
 You are Jarvis, a household AI assistant for Mike and his family.
 
@@ -30,6 +29,9 @@ You MUST:
 If the user asks to control lights, scenes, devices, or routines,
 you should call run_home_automation with an appropriate action, room, state, and extra info.
     `.trim(),
+    input_audio_transcription: {
+      model: 'whisper-1',
+    },
     tools: toolsSchema,
   },
 })

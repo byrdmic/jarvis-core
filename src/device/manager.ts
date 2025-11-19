@@ -1,4 +1,6 @@
 import { JarvisSession, JarvisEvent } from '../realtime/session'
+import { appendFile, mkdir } from 'node:fs/promises'
+import { join } from 'node:path'
 
 export class DeviceManager {
   private devices = new Map<string, {
@@ -87,6 +89,15 @@ export class DeviceManager {
           type: 'transcript_delta',
           text: event.data
         }))
+      } else if (event.type === 'user_transcript') {
+        // Log transcript to file
+        this.logTranscript(deviceId, event.data)
+
+        // Send user transcription
+        device.ws.send(JSON.stringify({
+          type: 'user_transcript',
+          text: event.data
+        }))
       } else if (event.type === 'response_done') {
         // Send response completion
         device.ws.send(JSON.stringify({
@@ -115,6 +126,17 @@ export class DeviceManager {
       device.session.disconnect()
       this.devices.delete(deviceId)
       console.log(`[DeviceManager] Force disconnected device: ${deviceId}`)
+    }
+  }
+
+  private async logTranscript(deviceId: string, text: string) {
+    const logDir = join(process.cwd(), 'logs')
+    try {
+      await mkdir(logDir, { recursive: true })
+      const timestamp = new Date().toISOString()
+      await appendFile(join(logDir, 'transcripts.log'), `[${timestamp}] [${deviceId}] ${text}\n`)
+    } catch (err) {
+      console.error('[DeviceManager] Failed to log transcript:', err)
     }
   }
 }

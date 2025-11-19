@@ -36,7 +36,7 @@ const server = Bun.serve<{ deviceId: string }>({
     const url = new URL(req.url)
 
     // Serve static test page
-    if (url.pathname === '/' || url.pathname === '/test-audio') {
+    if (url.pathname === '/' || url.pathname === '/client') {
       return new Response(Bun.file('public/index.html'), {
         headers: { 'Content-Type': 'text/html' },
       })
