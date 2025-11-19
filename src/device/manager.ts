@@ -16,20 +16,20 @@ export class DeviceManager {
 
     // Store the device and session
     this.devices.set(deviceId, { ws, session })
+  }
 
-    // Handle incoming messages from the device
-    ws.onmessage = (event) => {
-      this.handleDeviceMessage(deviceId, event.data)
-    }
+  handleMessage(ws: Bun.ServerWebSocket<{ deviceId: string }>, message: ArrayBuffer | string): void {
+    const deviceId = ws.data.deviceId
+    this.handleDeviceMessage(deviceId, message)
+  }
 
-    // Handle device disconnection
-    ws.onclose = () => {
-      console.log(`[DeviceManager] Device disconnected: ${deviceId}`)
-      const device = this.devices.get(deviceId)
-      if (device) {
-        device.session.disconnect()
-        this.devices.delete(deviceId)
-      }
+  handleClose(ws: Bun.ServerWebSocket<{ deviceId: string }>): void {
+    const deviceId = ws.data.deviceId
+    console.log(`[DeviceManager] Device disconnected: ${deviceId}`)
+    const device = this.devices.get(deviceId)
+    if (device) {
+      device.session.disconnect()
+      this.devices.delete(deviceId)
     }
   }
 
@@ -54,6 +54,8 @@ export class DeviceManager {
           device.session.sendText(message.text).catch((error) => {
             console.error(`[DeviceManager] Error sending text for ${deviceId}:`, error)
           })
+        } else if (message.type === 'commit') {
+          device.session.generateResponse()
         }
       } catch (error) {
         console.error(`[DeviceManager] Invalid JSON message from ${deviceId}:`, error)

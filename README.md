@@ -31,6 +31,7 @@ Device → WebSocket → DeviceManager → JarvisSession → OpenAI → JarvisSe
 ### HTTP Endpoints
 
 - `GET /health`: Health check endpoint
+- `GET /test-audio`: Web-based audio test client (microphone access required)
 - `POST /ask`: Legacy text-only endpoint accepting `{ "text": "command" }`
 
 ### WebSocket Endpoints
@@ -112,6 +113,9 @@ ws.onopen = () => {
   ws.send(audioBuffer); // Binary audio data
 };
 
+// To trigger a response (Manual VAD / Push-to-Talk):
+ws.send(JSON.stringify({ type: 'commit' }));
+
 // Receive responses
 ws.onmessage = (event) => {
   if (typeof event.data === 'string') {
@@ -131,6 +135,15 @@ ws.onmessage = (event) => {
 curl http://localhost:4000/health
 # Returns: {"ok": true, "env": "jarvis-core-bun"}
 ```
+
+### Testing Audio
+
+To test the audio pipeline with your microphone:
+1. Start the server: `bun run src/server.ts`
+2. Open your browser to `http://localhost:4000/test-audio`
+3. Click "Connect" to establish a WebSocket connection
+4. Hold "Hold to Speak" to stream microphone audio
+5. Listen for the AI response
 
 ## Project Structure
 

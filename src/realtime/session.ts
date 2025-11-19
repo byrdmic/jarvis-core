@@ -76,6 +76,10 @@ export class JarvisSession {
     // when using server VAD, so we don't need to manually call createResponse()
   }
 
+  generateResponse(): void {
+    this.createResponse()
+  }
+
   private createResponse(): void {
     const responseEvent = {
       type: 'response.create',

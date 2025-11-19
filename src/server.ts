@@ -3,7 +3,7 @@ import { JarvisSession } from './realtime/session'
 import { DeviceManager } from './device/manager'
 
 // Legacy session for /ask endpoint
-const legacySession = new JarvisSession()
+// const legacySession = new JarvisSession()
 
 // Device manager for WebSocket connections
 const deviceManager = new DeviceManager()
@@ -23,15 +23,24 @@ const server = Bun.serve<{ deviceId: string }>({
     },
     message(ws, message) {
       // Messages are handled by DeviceManager
-      console.log(`[server] WebSocket message from device: ${ws.data.deviceId}`)
+      // console.log(`[server] WebSocket message from device: ${ws.data.deviceId}`)
+      deviceManager.handleMessage(ws, message)
     },
     close(ws) {
-      console.log(`[server] WebSocket closed for device: ${ws.data.deviceId}`)
-      // DeviceManager handles cleanup in its onclose handler
+      // console.log(`[server] WebSocket closed for device: ${ws.data.deviceId}`)
+      // DeviceManager handles cleanup
+      deviceManager.handleClose(ws)
     },
   },
   async fetch(req, server) {
     const url = new URL(req.url)
+
+    // Serve static test page
+    if (url.pathname === '/' || url.pathname === '/test-audio') {
+      return new Response(Bun.file('public/index.html'), {
+        headers: { 'Content-Type': 'text/html' },
+      })
+    }
 
     // Simple health check
     if (url.pathname === '/health') {
@@ -87,20 +96,36 @@ const server = Bun.serve<{ deviceId: string }>({
 
       console.log('[/ask] user text:', text)
 
-      const jarvisReply = await legacySession.ask(text)
+      // Create a temporary session for this request to handle the interaction
+      // This prevents long-lived sessions from timing out (OpenAI limits sessions to 60m?)
+      const session = new JarvisSession()
+      
+      try {
+        const jarvisReply = await session.ask(text)
 
-      console.log('[/ask] jarvisReply:', jarvisReply)
-      if (jarvisReply.toolResults && jarvisReply.toolResults.length > 0) {
-        console.log(
-          '[/ask] jarvisReply.toolResults:',
-          JSON.stringify(jarvisReply.toolResults, null, 2),
-        )
+        console.log('[/ask] jarvisReply:', jarvisReply)
+        if (jarvisReply.toolResults && jarvisReply.toolResults.length > 0) {
+          console.log(
+            '[/ask] jarvisReply.toolResults:',
+            JSON.stringify(jarvisReply.toolResults, null, 2),
+          )
+        }
+
+        // Clean up session
+        session.disconnect()
+
+        return new Response(JSON.stringify(jarvisReply), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      } catch (error) {
+        console.error('[/ask] Error processing request:', error)
+        session.disconnect()
+        return new Response(JSON.stringify({ error: 'Internal Server Error' }), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' },
+        })
       }
-
-      return new Response(JSON.stringify(jarvisReply), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      })
     }
 
     return new Response('Not found', { status: 404 })

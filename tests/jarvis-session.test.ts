@@ -74,11 +74,11 @@ describe("JarvisSession", () => {
       const expectedResponse = {
         type: "response.create",
         response: {
-          modalities: ["text", "audio"],
+          instructions: "Respond to the user request.",
         },
       };
 
-      expect(expectedResponse.response.modalities).toEqual(["text", "audio"]);
+      expect(expectedResponse.response.instructions).toBe("Respond to the user request.");
     });
   });
 
