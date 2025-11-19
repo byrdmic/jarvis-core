@@ -1,4 +1,4 @@
-import { describe, test, expect } from "bun:test";
+import { describe, test, expect, mock } from "bun:test";
 import { JarvisSession, JarvisEvent } from "../src/realtime/session";
 
 // Mock WebSocket globally for all tests
@@ -11,11 +11,15 @@ const mockWebSocket = {
 };
 
 // Mock the ws module
-global.WebSocket = class {
-  constructor() {
-    return mockWebSocket as any;
-  }
-} as any;
+mock.module("ws", () => {
+  return {
+    default: class {
+      constructor() {
+        return mockWebSocket;
+      }
+    }
+  };
+});
 
 describe("JarvisSession", () => {
   describe("constructor", () => {

@@ -28,9 +28,7 @@ export class JarvisSession {
   constructor(eventCallback?: JarvisEventCallback) {
     this.eventCallback = eventCallback
 
-    const url = `wss://api.openai.com/v1/realtime?model=${encodeURIComponent(
-      config.openaiRealtimeModel,
-    )}`
+    const url = "wss://api.openai.com/v1/realtime?model=gpt-realtime";
 
     this.ws = new WebSocket(url, {
       headers: {

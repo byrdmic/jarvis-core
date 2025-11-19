@@ -1,6 +1,6 @@
 export const config = {
   openaiApiKey: Bun.env.OPENAI_API_KEY ?? '',
-  openaiRealtimeModel: 'gpt-4o-realtime-preview-2024-12-17', // Update to latest model version
+  openaiRealtimeModel: 'gpt-realtime', // Updated to match user provided documentation URL
   n8nWebhookUrl: Bun.env.N8N_JARVIS_WEBHOOK_URL ?? '',
   port: Number(Bun.env.PORT ?? 4000),
 }
