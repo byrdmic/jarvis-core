@@ -1,15 +1,36 @@
 import { config } from './config'
 import { JarvisSession } from './realtime/session'
+import { DeviceManager } from './device/manager'
 
-const session = new JarvisSession()
+// Legacy session for /ask endpoint
+const legacySession = new JarvisSession()
+
+// Device manager for WebSocket connections
+const deviceManager = new DeviceManager()
 
 type AskBody = {
   text?: string
 }
 
-const server = Bun.serve({
+const server = Bun.serve<{ deviceId: string }>({
   port: config.port,
-  fetch: async (req) => {
+  websocket: {
+    open(ws) {
+      // WebSocket opened - pass to DeviceManager
+      const deviceId = ws.data.deviceId
+      console.log(`[server] WebSocket opened for device: ${deviceId}`)
+      deviceManager.handleConnection(ws, deviceId)
+    },
+    message(ws, message) {
+      // Messages are handled by DeviceManager
+      console.log(`[server] WebSocket message from device: ${ws.data.deviceId}`)
+    },
+    close(ws) {
+      console.log(`[server] WebSocket closed for device: ${ws.data.deviceId}`)
+      // DeviceManager handles cleanup in its onclose handler
+    },
+  },
+  async fetch(req, server) {
     const url = new URL(req.url)
 
     // Simple health check
@@ -18,6 +39,30 @@ const server = Bun.serve({
         JSON.stringify({ ok: true, env: 'jarvis-core-bun' }),
         { status: 200, headers: { 'Content-Type': 'application/json' } },
       )
+    }
+
+    // WebSocket upgrade for device connections
+    if (url.pathname === '/ws') {
+      const deviceId = url.searchParams.get('deviceId')
+      if (!deviceId) {
+        return new Response('Missing deviceId parameter', { status: 400 })
+      }
+
+      // Validate deviceId (basic validation)
+      if (deviceId.length === 0 || deviceId.length > 100) {
+        return new Response('Invalid deviceId', { status: 400 })
+      }
+
+      const upgraded = server.upgrade(req, {
+        data: { deviceId }
+      })
+
+      if (upgraded) {
+        // Connection will be handled by the websocket handlers
+        return new Response(null, { status: 101 }) // Switching Protocols
+      } else {
+        return new Response('WebSocket upgrade failed', { status: 500 })
+      }
     }
 
     if (url.pathname === '/ask' && req.method === 'POST') {
@@ -42,7 +87,7 @@ const server = Bun.serve({
 
       console.log('[/ask] user text:', text)
 
-      const jarvisReply = await session.ask(text)
+      const jarvisReply = await legacySession.ask(text)
 
       console.log('[/ask] jarvisReply:', jarvisReply)
       if (jarvisReply.toolResults && jarvisReply.toolResults.length > 0) {
