@@ -11,6 +11,7 @@ export type JarvisEventType =
   | 'user_transcript'
   | 'response_done'
   | 'error'
+  | 'interruption'
 
 export type JarvisEvent = {
   type: JarvisEventType
@@ -87,8 +88,7 @@ export class JarvisSession {
     const responseEvent = {
       type: 'response.create',
       response: {
-        // modalities: ['text', 'audio'], // Removed to check if this causes error
-        instructions: 'Respond to the user request.'
+        // Let the session instructions guide the response
       },
     }
     console.log('[/realtime/session] sending response.create')
@@ -134,6 +134,28 @@ export class JarvisSession {
       this.eventCallback?.({
         type: 'user_transcript',
         data: msg.transcript
+      })
+    }
+
+    // Handle session update confirmation
+    if (msg.type === 'session.updated') {
+      console.log('[JarvisSession] Session updated successfully')
+    }
+
+    // Handle interruption (user starts speaking)
+    if (msg.type === 'input_audio_buffer.speech_started') {
+      console.log('[JarvisSession] User started speaking - Interruption detected')
+      
+      // 1. Clear any pending audio in the input buffer
+      this.ws.send(JSON.stringify({ type: 'input_audio_buffer.clear' }))
+      
+      // 2. Cancel the current response generation if any
+      this.ws.send(JSON.stringify({ type: 'response.cancel' }))
+      
+      // 3. Notify client to stop audio playback
+      this.eventCallback?.({
+        type: 'interruption',
+        data: null
       })
     }
 

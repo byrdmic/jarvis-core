@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>JARVIS // CORE</title>
     <style>
         :root {
@@ -276,6 +277,63 @@
         ::-webkit-scrollbar-track { background: #000; }
         ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
         ::-webkit-scrollbar-thumb:hover { background: var(--accent-color); }
+        /* Mobile Responsiveness */
+        @media (max-width: 768px) {
+            body {
+                height: auto;
+                min-height: 100vh;
+                overflow-y: auto;
+            }
+            
+            .main-container {
+                justify-content: flex-start;
+                padding-bottom: 80px; /* Space for controls if fixed, or just padding */
+                overflow-y: visible;
+            }
+
+            .chat-container, 
+            .terminal-container {
+                position: relative;
+                top: auto;
+                left: auto;
+                right: auto;
+                width: 90%;
+                max-width: none;
+                height: 350px;
+                margin: 10px auto;
+            }
+
+            .chat-container {
+                margin-top: 20px;
+            }
+
+            .controls-overlay {
+                position: fixed; /* Keep controls accessible */
+                bottom: 20px;
+                left: 50%;
+                transform: translateX(-50%);
+                width: 90%;
+                justify-content: center;
+                background: rgba(0,0,0,0.8);
+                padding: 10px;
+                border-radius: 10px;
+                border: 1px solid var(--accent-dim);
+                flex-wrap: wrap;
+            }
+            
+            .controls-overlay button {
+                padding: 10px 15px;
+                font-size: 0.9rem;
+                flex: 1;
+                white-space: nowrap;
+            }
+
+            .header {
+                flex-direction: column;
+                gap: 10px;
+                text-align: center;
+            }
+        }
     </style>
 </head>
 <body>
@@ -333,6 +391,7 @@
         let audioQueue = [];
         let isPlaying = false;
         let nextStartTime = 0;
+        let scheduledSources = [];
 
         // Elements
         const btnConnect = document.getElementById('btnConnect');
@@ -460,6 +519,21 @@
             }
             source.start(nextStartTime);
             nextStartTime += buffer.duration;
+
+            scheduledSources.push(source);
+            source.onended = () => {
+                const index = scheduledSources.indexOf(source);
+                if (index > -1) scheduledSources.splice(index, 1);
+            };
+        }
+        
+        function stopAudioPlayback() {
+            if (!audioContext) return;
+            scheduledSources.forEach(source => {
+                try { source.stop(); } catch(e) {}
+            });
+            scheduledSources = [];
+            nextStartTime = audioContext.currentTime;
         }
 
         // --- Visualizer ---
@@ -612,6 +686,9 @@
                             // log('Response complete', 'system');
                         } else if (msg.type === 'error') {
                             log(`Error: ${msg.error}`, 'error');
+                        } else if (msg.type === 'interruption') {
+                            stopAudioPlayback();
+                            log('Interruption detected - Audio cleared', 'system');
                         }
                     } catch (e) {
                         // log('Received: ' + data, 'system');

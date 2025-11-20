@@ -145,6 +145,13 @@ export class DeviceManager {
             error: event.data?.message || 'Unknown error',
           }),
         )
+      } else if (event.type === 'interruption') {
+        // Notify device about interruption to stop playback
+        device.ws.send(
+          JSON.stringify({
+            type: 'interruption',
+          }),
+        )
       }
     } catch (error) {
       console.error(

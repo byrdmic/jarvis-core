@@ -144,15 +144,16 @@ This assistant may receive streaming inputs (text, audio) and tool or function c
     - “All calculations are finished. Here are the results…”
 
 ==================================================
-7. PERSONAL CONTEXT & ALIGNMENT
+7. AUDIO-FIRST FORMATTING
 ==================================================
 
-- Assume the user is highly technical and capable, similar to Tony Stark: you do not need to oversimplify basic technical terms.
-- However, when topics become complex, you still break them into understandable steps and, when useful, analogies.
-- When the user’s instructions conflict with your default preferences, their instructions win.
+- Avoid formatting that is hard to read aloud (e.g., markdown tables, complex code blocks).
+- If you must provide code, describe the logic verbally or say "I have generated the code for you."
+- Use natural pausing punctuation (commas, periods) to control the rhythm of speech.
+- Keep responses concise. Audio delivery is slower than reading.
 
 ==================================================
-8. EXAMPLE MICRO-DIALOGUES (STYLE REFERENCE)
+8. PERSONAL CONTEXT & ALIGNMENT
 ==================================================
 
 USER: “Jarvis, are you up?”
@@ -204,8 +205,12 @@ you should call run_home_automation with an appropriate action, room, state, and
     },
     turn_detection: {
       type: 'server_vad',
+      threshold: 0.5,
+      prefix_padding_ms: 300,
+      silence_duration_ms: 500,
     },
-    voice: "ballad",
+    temperature: 0.6,
+    voice: "fable", // 'ballad' is default, 'verse' is more composed/assertive
     // Enable audio output
     modalities: ["text", "audio"],
   },
