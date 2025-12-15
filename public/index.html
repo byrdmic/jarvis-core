@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JARVIS // CORE</title>
+    <style>
+        :root {
+            --bg-color: #050505;
+            --terminal-bg: #0a0a0a;
+            --text-color: #e0e0e0;
+            --accent-color: #00f3ff;
+            --accent-dim: #00f3ff33;
+            --alert-color: #ff3366;
+            --font-mono: 'Courier New', Courier, monospace;
+        }
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: var(--font-mono);
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .header {
+            padding: 20px;
+            border-bottom: 1px solid var(--accent-dim);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(10, 10, 10, 0.8);
+            z-index: 20;
+        }
+        .title {
+            font-size: 1.5rem;
+            font-weight: bold;
+            letter-spacing: 2px;
+            color: var(--accent-color);
+            text-shadow: 0 0 10px var(--accent-dim);
+        }
+        .status {
+            font-size: 0.9rem;
+            color: var(--text-color);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: #333;
+            box-shadow: 0 0 5px #333;
+            transition: all 0.3s ease;
+        }
+        .status-indicator.connected {
+            background-color: var(--accent-color);
+            box-shadow: 0 0 10px var(--accent-color);
+        }
+        .status-indicator.disconnected {
+            background-color: var(--alert-color);
+            box-shadow: 0 0 10px var(--alert-color);
+        }
+        
+        .main-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            justify-content: center;
+            align-items: center;
+            background: radial-gradient(circle at center, #111 0%, #050505 100%);
+        }
+
+        /* The Brain */
+        #visualizer {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+        
+        .controls-overlay {
+            z-index: 10;
+            position: absolute;
+            bottom: 50px;
+            display: flex;
+            gap: 20px;
+        }
+
+        button {
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid var(--accent-color);
+            color: var(--accent-color);
+            padding: 12px 30px;
+            font-family: var(--font-mono);
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            backdrop-filter: blur(5px);
+            border-radius: 2px;
+        }
+        button:hover:not(:disabled) {
+            background: var(--accent-color);
+            color: var(--bg-color);
+            box-shadow: 0 0 20px var(--accent-color);
+        }
+        button:disabled {
+            border-color: #444;
+            color: #666;
+            cursor: not-allowed;
+        }
+        button.active {
+            background: var(--accent-color);
+            color: var(--bg-color);
+            box-shadow: 0 0 25px var(--accent-color);
+        }
+        button.recording {
+            border-color: var(--alert-color);
+            color: var(--alert-color);
+            box-shadow: 0 0 10px var(--alert-color);
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 10px var(--alert-color); }
+            50% { box-shadow: 0 0 25px var(--alert-color); }
+            100% { box-shadow: 0 0 10px var(--alert-color); }
+        }
+
+        /* Terminal Log */
+        .terminal-container {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 400px;
+            height: 400px;
+            background: rgba(0, 0, 0, 0.85);
+            border: 1px solid var(--accent-dim);
+            border-radius: 5px;
+            display: flex;
+            flex-direction: column;
+            z-index: 10;
+            backdrop-filter: blur(10px);
+            font-size: 0.8rem;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+        .terminal-header {
+            padding: 8px 15px;
+            background: rgba(0, 243, 255, 0.1);
+            border-bottom: 1px solid var(--accent-dim);
+            font-weight: bold;
+            color: var(--accent-color);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            display: flex;
+            justify-content: space-between;
+        }
+        .terminal-header .minimize {
+            cursor: pointer;
+        }
+        #log {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .msg-entry {
+            line-height: 1.4;
+            word-break: break-word;
+            animation: fadeIn 0.2s ease;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .msg-system { color: #666; }
+        .msg-user { color: #fff; border-left: 2px solid #fff; padding-left: 8px; }
+        .msg-jarvis { color: var(--accent-color); border-left: 2px solid var(--accent-color); padding-left: 8px; }
+        .msg-error { color: var(--alert-color); }
+        .timestamp { opacity: 0.5; font-size: 0.7em; margin-right: 8px; }
+
+        /* Chat Interface */
+        .chat-container {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            width: 400px;
+            height: 400px;
+            background: rgba(0, 0, 0, 0.85);
+            border: 1px solid var(--accent-dim);
+            border-radius: 5px;
+            display: flex;
+            flex-direction: column;
+            z-index: 10;
+            backdrop-filter: blur(10px);
+            font-size: 0.9rem;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+        .chat-header {
+            padding: 8px 15px;
+            background: rgba(0, 243, 255, 0.1);
+            border-bottom: 1px solid var(--accent-dim);
+            font-weight: bold;
+            color: var(--accent-color);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        #chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .chat-input-container {
+            padding: 10px;
+            border-top: 1px solid var(--accent-dim);
+            display: flex;
+            gap: 10px;
+        }
+        #chat-input {
+            flex: 1;
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid #333;
+            color: var(--text-color);
+            padding: 8px;
+            font-family: var(--font-mono);
+            border-radius: 3px;
+            outline: none;
+        }
+        #chat-input:focus {
+            border-color: var(--accent-color);
+        }
+        #chat-send-btn {
+            background: var(--accent-dim);
+            border: 1px solid var(--accent-color);
+            color: var(--accent-color);
+            padding: 5px 15px;
+            font-family: var(--font-mono);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        #chat-send-btn:hover {
+            background: var(--accent-color);
+            color: #000;
+        }
+        .chat-msg {
+            padding: 8px 12px;
+            border-radius: 4px;
+            max-width: 85%;
+            word-wrap: break-word;
+        }
+        .chat-msg-user {
+            align-self: flex-end;
+            background: rgba(0, 243, 255, 0.1);
+            border: 1px solid var(--accent-dim);
+            color: #fff;
+        }
+        .chat-msg-jarvis {
+            align-self: flex-start;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid #333;
+            color: var(--accent-color);
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #000; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--accent-color); }
+        /* Mobile Responsiveness */
+        @media (max-width: 768px) {
+            body {
+                height: auto;
+                min-height: 100vh;
+                overflow-y: auto;
+            }
+            
+            .main-container {
+                justify-content: flex-start;
+                padding-bottom: 80px; /* Space for controls if fixed, or just padding */
+                overflow-y: visible;
+            }
+
+            .chat-container, 
+            .terminal-container {
+                position: relative;
+                top: auto;
+                left: auto;
+                right: auto;
+                width: 90%;
+                max-width: none;
+                height: 350px;
+                margin: 10px auto;
+            }
+
+            .chat-container {
+                margin-top: 20px;
+            }
+
+            .controls-overlay {
+                position: fixed; /* Keep controls accessible */
+                bottom: 20px;
+                left: 50%;
+                transform: translateX(-50%);
+                width: 90%;
+                justify-content: center;
+                background: rgba(0,0,0,0.8);
+                padding: 10px;
+                border-radius: 10px;
+                border: 1px solid var(--accent-dim);
+                flex-wrap: wrap;
+            }
+            
+            .controls-overlay button {
+                padding: 10px 15px;
+                font-size: 0.9rem;
+                flex: 1;
+                white-space: nowrap;
+            }
+
+            .header {
+                flex-direction: column;
+                gap: 10px;
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="title">JARVIS // CORE</div>
+        <div class="status">
+            <div id="connectionStatus" class="status-indicator disconnected"></div>
+            <span id="statusText">OFFLINE</span>
+        </div>
+    </div>
+
+    <div class="main-container">
+        <canvas id="visualizer"></canvas>
+
+        <div class="chat-container">
+            <div class="chat-header">
+                <span>>> SYSTEM CHAT</span>
+            </div>
+            <div id="chat-messages"></div>
+            <div class="chat-input-container">
+                <input type="text" id="chat-input" placeholder="Enter command...">
+                <button id="chat-send-btn">SEND</button>
+            </div>
+        </div>
+
+        <div class="terminal-container">
+            <div class="terminal-header">
+                <span>>> SYSTEM LOG</span>
+            </div>
+            <div id="log"></div>
+        </div>
+
+        <div class="controls-overlay">
+            <button id="btnConnect">Initialize System</button>
+            <button id="btnMic" disabled>Microphone: OFF</button>
+            <button id="btnDebug">Debug: OFF</button>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const SAMPLE_RATE = 24000; // OpenAI recommends 24kHz
+        
+        // State
+        let ws = null;
+        let audioContext = null;
+        let processor = null;
+        let inputSource = null;
+        let analyser = null;
+        let isMicActive = false;
+        let isConnected = false;
+        let isDebug = false;
+        
+        // Audio Queue
+        let audioQueue = [];
+        let isPlaying = false;
+        let nextStartTime = 0;
+        let scheduledSources = [];
+
+        // Elements
+        const btnConnect = document.getElementById('btnConnect');
+        const btnMic = document.getElementById('btnMic');
+        const btnDebug = document.getElementById('btnDebug');
+        const statusDiv = document.getElementById('connectionStatus');
+        const statusText = document.getElementById('statusText');
+        const logDiv = document.getElementById('log');
+        const canvas = document.getElementById('visualizer');
+        const ctx = canvas.getContext('2d');
+        
+        // Chat Elements
+        const chatMessagesDiv = document.getElementById('chat-messages');
+        const chatInput = document.getElementById('chat-input');
+        const chatSendBtn = document.getElementById('chat-send-btn');
+        let currentResponseDiv = null;
+
+        // --- Logging ---
+        function log(msg, type = 'system') {
+            const div = document.createElement('div');
+            div.className = `msg-entry msg-${type}`;
+            const time = new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute:'2-digit', second:'2-digit' });
+            div.innerHTML = `<span class="timestamp">[${time}]</span>${msg}`;
+            logDiv.appendChild(div);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function logDebug(msg) {
+            if (isDebug) {
+                console.log('[DEBUG]', msg);
+                log(msg, 'system');
+            }
+        }
+
+        // --- Audio Processing ---
+        function floatTo16BitPCM(output, offset, input) {
+            for (let i = 0; i < input.length; i++, offset += 2) {
+                let s = Math.max(-1, Math.min(1, input[i]));
+                output.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+            }
+        }
+
+        async function initAudio() {
+            try {
+                audioContext = new AudioContext({ sampleRate: SAMPLE_RATE });
+                nextStartTime = 0;
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = 2048;
+                
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    audio: {
+                        channelCount: 1,
+                        sampleRate: SAMPLE_RATE,
+                        echoCancellation: true,
+                        noiseSuppression: true
+                    }
+                });
+
+                inputSource = audioContext.createMediaStreamSource(stream);
+                
+                // Processor for recording
+                processor = audioContext.createScriptProcessor(4096, 1, 1);
+                processor.onaudioprocess = (e) => {
+                    if (!isMicActive || !isConnected) return;
+
+                    const inputData = e.inputBuffer.getChannelData(0);
+                    
+                    // Convert to PCM16
+                    const pcm16Buffer = new ArrayBuffer(inputData.length * 2);
+                    const view = new DataView(pcm16Buffer);
+                    floatTo16BitPCM(view, 0, inputData);
+                    
+                    if (ws && ws.readyState === WebSocket.OPEN) {
+                        ws.send(pcm16Buffer);
+                        logDebug(`Sent audio chunk: ${pcm16Buffer.byteLength} bytes`);
+                    } else {
+                        logDebug(`WebSocket not open, skipping audio chunk`);
+                    }
+                };
+
+                // Routing for Visuals and Recording
+                // Mic -> Analyser (for visuals)
+                inputSource.connect(analyser);
+                // Mic -> Processor (for recording)
+                inputSource.connect(processor);
+                // Processor -> Destination (Required for script processor to run, but mute it to avoid feedback)
+                // Actually, we can connect processor to a GainNode with gain 0, then to destination.
+                const muteNode = audioContext.createGain();
+                muteNode.gain.value = 0;
+                processor.connect(muteNode);
+                muteNode.connect(audioContext.destination);
+
+                log('Audio subsystems initialized', 'system');
+                startVisualizer();
+                
+                return true;
+            } catch (err) {
+                log('Audio initialization failed: ' + err.message, 'error');
+                return false;
+            }
+        }
+
+        function playAudioChunk(arrayBuffer) {
+            if (!audioContext) return;
+
+            const int16 = new Int16Array(arrayBuffer);
+            const float32 = new Float32Array(int16.length);
+            for(let i=0; i<int16.length; i++) {
+                float32[i] = int16[i] / 32768.0;
+            }
+
+            const buffer = audioContext.createBuffer(1, float32.length, SAMPLE_RATE);
+            buffer.getChannelData(0).set(float32);
+
+            const source = audioContext.createBufferSource();
+            source.buffer = buffer;
+            
+            // Route Jarvis Audio: Source -> Analyser -> Destination
+            source.connect(analyser);
+            analyser.connect(audioContext.destination);
+
+            const currentTime = audioContext.currentTime;
+            if (nextStartTime < currentTime) {
+                nextStartTime = currentTime;
+            }
+            source.start(nextStartTime);
+            nextStartTime += buffer.duration;
+
+            scheduledSources.push(source);
+            source.onended = () => {
+                const index = scheduledSources.indexOf(source);
+                if (index > -1) scheduledSources.splice(index, 1);
+            };
+        }
+        
+        function stopAudioPlayback() {
+            if (!audioContext) return;
+            scheduledSources.forEach(source => {
+                try { source.stop(); } catch(e) {}
+            });
+            scheduledSources = [];
+            nextStartTime = audioContext.currentTime;
+        }
+
+        // --- Visualizer ---
+        function startVisualizer() {
+            const bufferLength = analyser.frequencyBinCount;
+            const dataArray = new Uint8Array(bufferLength);
+            
+            function draw() {
+                requestAnimationFrame(draw);
+                
+                // Resize canvas if needed
+                if (canvas.width !== canvas.clientWidth || canvas.height !== canvas.clientHeight) {
+                    canvas.width = canvas.clientWidth;
+                    canvas.height = canvas.clientHeight;
+                }
+
+                const w = canvas.width;
+                const h = canvas.height;
+                const cx = w / 2;
+                const cy = h / 2;
+
+                analyser.getByteFrequencyData(dataArray);
+
+                // Determine who is speaking
+                const isJarvisSpeaking = audioContext && nextStartTime > audioContext.currentTime;
+                const isUserSpeaking = isMicActive && !isJarvisSpeaking;
+                
+                let hueBase = 180; // Cyan
+                let colorHex = '#00f3ff';
+                let colorRGB = '0, 243, 255';
+
+                if (isUserSpeaking) {
+                    hueBase = 340; // Pink/Red
+                    colorHex = '#ff3366';
+                    colorRGB = '255, 51, 102';
+                }
+
+                ctx.fillStyle = 'rgba(5, 5, 5, 0.2)'; // Fade out trail
+                ctx.fillRect(0, 0, w, h);
+
+                // Draw Circular Visualizer
+                const radius = Math.min(w, h) / 4;
+                const bars = 100;
+                const step = Math.floor(bufferLength / bars);
+                
+                ctx.beginPath();
+                for (let i = 0; i < bars; i++) {
+                    const value = dataArray[i * step];
+                    const percent = value / 255;
+                    const barHeight = radius * percent * 1.5;
+                    const angle = (Math.PI * 2 * i) / bars;
+                    
+                    const x1 = cx + Math.cos(angle) * radius;
+                    const y1 = cy + Math.sin(angle) * radius;
+                    const x2 = cx + Math.cos(angle) * (radius + barHeight);
+                    const y2 = cy + Math.sin(angle) * (radius + barHeight);
+
+                    const hue = hueBase + (percent * 60);
+                    ctx.strokeStyle = `hsl(${hue}, 100%, 50%)`;
+                    ctx.lineWidth = 2;
+                    
+                    ctx.moveTo(x1, y1);
+                    ctx.lineTo(x2, y2);
+                }
+                ctx.stroke();
+
+                // Inner Glow
+                ctx.beginPath();
+                ctx.arc(cx, cy, radius - 5, 0, Math.PI * 2);
+                ctx.fillStyle = '#000';
+                ctx.fill();
+                ctx.strokeStyle = colorHex;
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                
+                // Core Pulse
+                const avg = dataArray.reduce((a,b) => a+b, 0) / bufferLength;
+                ctx.beginPath();
+                ctx.arc(cx, cy, (radius/2) + (avg/2), 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(${colorRGB}, ${avg/255})`;
+                ctx.fill();
+            }
+            draw();
+        }
+
+        // --- WebSocket ---
+        btnConnect.onclick = async () => {
+            if (isConnected) {
+                // Disconnect logic would go here, but let's just reload for simplicity or implement disconnect
+                location.reload();
+                return;
+            }
+
+            const success = await initAudio();
+            if (!success) return;
+
+            const deviceId = 'web-brain-' + Math.random().toString(36).substr(2, 9);
+            ws = new WebSocket(`ws://${window.location.host}/ws?deviceId=${deviceId}`);
+            ws.binaryType = 'arraybuffer';
+
+            ws.onopen = () => {
+                isConnected = true;
+                statusDiv.className = 'status-indicator connected';
+                statusText.textContent = 'ONLINE';
+                statusText.style.color = '#00f3ff';
+                btnConnect.textContent = 'Disconnect';
+                btnMic.disabled = false;
+                log('System initialized. Connected to Jarvis Core.', 'system');
+            };
+
+            ws.onclose = () => {
+                isConnected = false;
+                statusDiv.className = 'status-indicator disconnected';
+                statusText.textContent = 'OFFLINE';
+                statusText.style.color = '#ff3366';
+                btnConnect.textContent = 'Reconnect';
+                btnMic.disabled = true;
+                btnMic.className = '';
+                isMicActive = false;
+                log('Connection lost.', 'error');
+            };
+
+            ws.onmessage = async (event) => {
+                const data = event.data;
+
+                if (typeof data === 'string') {
+                    logDebug(`Received text data: ${data.substring(0, 100)}${data.length > 100 ? '...' : ''}`);
+                } else {
+                    logDebug(`Received binary data: ${data.byteLength} bytes`);
+                }
+
+                log(`Received: ${data}`, 'system');
+                if (data instanceof ArrayBuffer) {
+                    playAudioChunk(data);
+                } else {
+                    try {
+                        const msg = JSON.parse(data);
+                        if (msg.type === 'transcript_delta' || msg.type === 'text_delta') {
+                             if (!currentResponseDiv) {
+                                 currentResponseDiv = document.createElement('div');
+                                 currentResponseDiv.className = 'chat-msg chat-msg-jarvis';
+                                 chatMessagesDiv.appendChild(currentResponseDiv);
+                             }
+                             currentResponseDiv.textContent += msg.text;
+                             chatMessagesDiv.scrollTop = chatMessagesDiv.scrollHeight;
+                        } else if (msg.type === 'user_transcript') {
+                            log(`${msg.text}`, 'user');
+                        } else if (msg.type === 'response_done') {
+                            currentResponseDiv = null;
+                            // log('Response complete', 'system');
+                        } else if (msg.type === 'error') {
+                            log(`Error: ${msg.error}`, 'error');
+                        } else if (msg.type === 'interruption') {
+                            stopAudioPlayback();
+                            log('Interruption detected - Audio cleared', 'system');
+                        }
+                    } catch (e) {
+                        // log('Received: ' + data, 'system');
+                    }
+                }
+            };
+        };
+
+        btnMic.onclick = () => {
+            if (!isConnected) return;
+            isMicActive = !isMicActive;
+            
+            if (isMicActive) {
+                btnMic.textContent = 'Microphone: LIVE';
+                btnMic.className = 'recording';
+                log('Audio input stream active. Listening...', 'system');
+                if (audioContext.state === 'suspended') audioContext.resume();
+            } else {
+                btnMic.textContent = 'Microphone: OFF';
+                btnMic.className = '';
+                log('Audio input stream muted.', 'system');
+                // Send commit signal just in case we cut off mid-sentence?
+                // ws.send(JSON.stringify({ type: 'commit' }));
+            }
+        };
+
+        btnDebug.onclick = () => {
+            isDebug = !isDebug;
+            btnDebug.textContent = isDebug ? 'Debug: ON' : 'Debug: OFF';
+            btnDebug.className = isDebug ? 'active' : '';
+            log(`Debug mode ${isDebug ? 'enabled' : 'disabled'}`, 'system');
+        };
+
+        // --- Chat Interaction ---
+        function sendChatMessage() {
+            const text = chatInput.value.trim();
+            if (!text) return;
+            if (!isConnected) {
+                log('System offline. Connect first.', 'error');
+                return;
+            }
+            
+            // Add to chat UI
+            const div = document.createElement('div');
+            div.className = 'chat-msg chat-msg-user';
+            div.textContent = text;
+            chatMessagesDiv.appendChild(div);
+            chatMessagesDiv.scrollTop = chatMessagesDiv.scrollHeight;
+            
+            // Send to server
+            ws.send(JSON.stringify({ type: 'text', text: text }));
+            
+            chatInput.value = '';
+        }
+
+        chatSendBtn.onclick = sendChatMessage;
+        chatInput.onkeypress = (e) => {
+            if (e.key === 'Enter') sendChatMessage();
+        };
+
+    </script>
+</body>
+</html>
